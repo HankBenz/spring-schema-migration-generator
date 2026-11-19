@@ -39,7 +39,7 @@ jobs:
             echo "::error::Branch name cannot be used as a version"
             exit 1
           fi
-          version="$(date -u +%Y%m%d.%H%M)-${branch}"
+          version="${branch}-$(date -u +%y%m%d%H%M)"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "Release version $version"
 
