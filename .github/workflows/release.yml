@@ -57,14 +57,16 @@ jobs:
             gh release delete "$VERSION" --yes --cleanup-tag
           fi
           gh api --method DELETE "/repos/${GITHUB_REPOSITORY}/git/refs/tags/${VERSION}" >/dev/null 2>&1 || true
-          if gh api "/orgs/${GITHUB_REPOSITORY_OWNER}" >/dev/null 2>&1; then
-            versions_url="/orgs/${GITHUB_REPOSITORY_OWNER}/packages/maven/no1.libs.spring-schema-migration-generator/versions"
-          else
-            versions_url="/user/packages/maven/no1.libs.spring-schema-migration-generator/versions"
-          fi
-          ids="$(gh api --paginate "$versions_url" --jq ".[] | select(.name==\"${VERSION}\") | .id" || true)"
-          for id in $ids; do
-            gh api --method DELETE "${versions_url}/${id}"
+          packages="$(gh api --paginate "/repos/${GITHUB_REPOSITORY}/packages?package_type=maven" --jq '.[].name' 2>/dev/null || true)"
+          for package in $packages; do
+            versions_url="/repos/${GITHUB_REPOSITORY}/packages/maven/${package}/versions"
+            ids="$(gh api --paginate "$versions_url" --jq ".[] | select(.name==\"${VERSION}\") | .id" 2>/dev/null || true)"
+            for id in $ids; do
+              case "$id" in
+                ''|*[!0-9]*) continue ;;
+              esac
+              gh api --method DELETE "${versions_url}/${id}"
+            done
           done
 
       - name: Publish to GitHub Packages
