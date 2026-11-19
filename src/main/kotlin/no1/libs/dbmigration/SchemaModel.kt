@@ -286,9 +286,12 @@ fun canonicalType(sqlType: String): String {
 	type = type.replace(Regex("""timestamp\(\d+\)"""), "timestamp")
 	type = type.replace(Regex("""timestamptz\(\d+\)"""), "timestamptz")
 	type = type.replace(Regex("""\breal\b"""), "float4")
+	type = type.replace(Regex("""\bbigserial\b"""), "int8")
 	type = type.replace(Regex("""\bbigint\b"""), "int8")
-	type = type.replace(Regex("""\binteger\b"""), "int4")
+	type = type.replace(Regex("""\bsmallserial\b"""), "int2")
 	type = type.replace(Regex("""\bsmallint\b"""), "int2")
+	type = type.replace(Regex("""\bserial\b"""), "int4")
+	type = type.replace(Regex("""\binteger\b"""), "int4")
 	type = type.replace(Regex("""\bboolean\b"""), "bool")
 	return type.replace(Regex("""\s+"""), " ").trim()
 }

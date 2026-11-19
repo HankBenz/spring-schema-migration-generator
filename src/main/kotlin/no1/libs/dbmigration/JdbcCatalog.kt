@@ -151,6 +151,55 @@ private fun readUniqueConstraints(connection: Connection): Map<Pair<String, Stri
 }
 
 private fun readChecks(connection: Connection): Map<Triple<String, String, String>, CheckModel> {
+	val product = connection.metaData.databaseProductName.lowercase()
+	if (product.contains("postgres")) {
+		readPostgresChecks(connection)?.let { return it }
+	}
+	return readInformationSchemaChecks(connection)
+}
+
+private fun readPostgresChecks(connection: Connection): Map<Triple<String, String, String>, CheckModel>? {
+	val checks = linkedMapOf<Triple<String, String, String>, CheckModel>()
+	try {
+		connection.createStatement().use { statement ->
+			statement.executeQuery(
+				"""
+				select n.nspname,
+					c.relname,
+					con.conname,
+					pg_get_constraintdef(con.oid, true),
+					(
+						select string_agg(att.attname, ',' order by u.ord)
+						from unnest(con.conkey) with ordinality as u(attnum, ord)
+						join pg_catalog.pg_attribute att
+							on att.attrelid = con.conrelid and att.attnum = u.attnum
+					)
+				from pg_catalog.pg_constraint con
+				join pg_catalog.pg_class c on c.oid = con.conrelid
+				join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+				where con.contype = 'c'
+					and n.nspname <> 'information_schema'
+					and n.nspname not like 'pg_%'
+				""".trimIndent(),
+			).use { rows ->
+				while (rows.next()) {
+					val schema = rows.getString(1)?.lowercase() ?: continue
+					val table = rows.getString(2)?.lowercase() ?: continue
+					val name = rows.getString(3)?.lowercase() ?: continue
+					val expression = rows.getString(4) ?: continue
+					val columns = rows.getString(5)?.split(',')?.map { it.lowercase() }.orEmpty()
+					checks[Triple(schema, table, name)] = CheckModel(name, columns, expression)
+				}
+			}
+		}
+	} catch (failure: SQLException) {
+		log.debug("pg_catalog check constraints are not available: {}", failure.message)
+		return null
+	}
+	return checks
+}
+
+private fun readInformationSchemaChecks(connection: Connection): Map<Triple<String, String, String>, CheckModel> {
 	val columns = mutableMapOf<Pair<String, String>, MutableList<String>>()
 	try {
 		connection.createStatement().use { statement ->

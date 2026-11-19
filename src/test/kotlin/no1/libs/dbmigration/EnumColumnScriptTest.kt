@@ -1,6 +1,7 @@
 package no1.libs.dbmigration
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class EnumColumnScriptTest {
@@ -26,6 +27,28 @@ class EnumColumnScriptTest {
 			listOf("""alter table "public"."payamak_report" add column "state" varchar(255) not null check (state in ('PENDING', 'REVIEWED', 'POSTPONED'));"""),
 			migrationStatements(required, actual),
 		)
+	}
+
+	@Test
+	fun `a postgres serial id is already the entity bigint`() {
+		val id = ColumnModel("id", "bigint", nullable = false, defaultSql = "nextval('id')")
+		val required = schema(table(listOf(id)))
+		val actual = schema(table(listOf(id.copy(sqlType = "bigserial"))))
+
+		assertTrue(migrationStatements(required, actual).isEmpty())
+	}
+
+	@Test
+	fun `a postgres rewritten enum check is the entity check`() {
+		val rewritten = CheckModel(
+			"payamak_report_state_check",
+			listOf("state"),
+			"((state)::text = ANY (ARRAY['PENDING'::text, 'REVIEWED'::text, 'POSTPONED'::text]))",
+		)
+		val required = schema(table(listOf(state), listOf(stateValues)))
+		val actual = schema(table(listOf(state), listOf(rewritten)))
+
+		assertTrue(migrationStatements(required, actual).isEmpty())
 	}
 
 	@Test

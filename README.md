@@ -22,7 +22,7 @@ Releases are published to GitHub. The jar can be downloaded without a token. Mav
 hankbenz:spring-schema-migration-generator:init-261119
 ```
 
-The version is `<branch>-<yyMMdd>`, for example `init-261119`. Use the newest release from [Releases](https://github.com/HankBenz/spring-schema-migration-generator/releases).
+The version on GitHub is `<branch>-<yyMMdd>`, for example `init-261119`. Use the newest release from [Releases](https://github.com/HankBenz/spring-schema-migration-generator/releases). A local `mvn install` publishes the version `local` from this repository's POM. The release workflow replaces that with the branch-and-date version before it publishes.
 
 Gradle:
 

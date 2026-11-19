@@ -5,7 +5,7 @@
 
 	<groupId>hankbenz</groupId>
 	<artifactId>spring-schema-migration-generator</artifactId>
-	<version>0.1.0</version>
+	<version>local</version>
 	<name>spring-schema-migration-generator</name>
 	<description>Compares JPA entities with the live database and writes the next Flyway migration.</description>
 
