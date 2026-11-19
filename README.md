@@ -1,0 +1,1 @@
+# spring-db-migration-generator
