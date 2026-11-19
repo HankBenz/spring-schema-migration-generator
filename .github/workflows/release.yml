@@ -32,16 +32,7 @@ jobs:
 
       - name: Version from date and branch
         id: version
-        run: |
-          branch="${GITHUB_REF_NAME//\//_}"
-          branch="$(printf '%s' "$branch" | sed -E 's/[^A-Za-z0-9_-]+/_/g; s/^_+//; s/_+$//')"
-          if [ -z "$branch" ]; then
-            echo "::error::Branch name cannot be used as a version"
-            exit 1
-          fi
-          version="${branch}-$(date -u +%y%m%d)"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "Release version $version"
+        run: bash .github/scripts/release-version.sh
 
       - name: Test
         run: mvn -B verify
@@ -52,148 +43,19 @@ jobs:
       - name: Replace the existing release
         env:
           VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          set -euo pipefail
-          if gh release view "$VERSION" >/dev/null 2>&1; then
-            gh release delete "$VERSION" --yes --cleanup-tag
-          fi
-          gh api --method DELETE "/repos/${GITHUB_REPOSITORY}/git/refs/tags/${VERSION}" >/dev/null 2>&1 || true
+        run: bash .github/scripts/delete-github-release.sh
 
       - name: Publish to GitHub Packages
         env:
           VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          set -euo pipefail
-
-          delete_maven_version() {
-            local owner owner_type api_root group artifact listed package_name encoded page code id del deleted body
-            owner="${GITHUB_REPOSITORY_OWNER}"
-            owner_type="$(gh api "users/${owner}" --jq .type)"
-            if [ "$owner_type" = "Organization" ]; then
-              api_root="orgs/${owner}"
-            else
-              api_root="users/${owner}"
-            fi
-
-            read -r group artifact < <(python3 - <<'PY'
-          import xml.etree.ElementTree as ET
-          ns = {"m": "http://maven.apache.org/POM/4.0.0"}
-          root = ET.parse("pom.xml").getroot()
-          group = root.findtext("m:groupId", default="", namespaces=ns)
-          artifact = root.findtext("m:artifactId", default="", namespaces=ns)
-          print(f"{group} {artifact}")
-          PY
-            )
-            if [ -z "$group" ] || [ -z "$artifact" ]; then
-              echo "::error::Could not read Maven coordinates from pom.xml"
-              return 1
-            fi
-
-            if ! listed="$(gh api --paginate "/${api_root}/packages?package_type=maven" \
-              --jq ".[] | select(.repository.full_name==\"${GITHUB_REPOSITORY}\" or .name==\"${artifact}\" or .name==\"${group}.${artifact}\" or .name==\"${group}/${artifact}\") | .name")"; then
-              echo "Could not list Maven packages under ${api_root}; trying this project's coordinates."
-              listed=""
-            fi
-
-            local -a names=()
-            while IFS= read -r package_name; do
-              [ -n "$package_name" ] || continue
-              names+=("$package_name")
-            done < <(
-              {
-                printf '%s\n' "$listed"
-                printf '%s\n' "$artifact" "${group}.${artifact}" "${group}/${artifact}"
-              } | awk 'NF && !seen[$0]++'
-            )
-
-            body="$(mktemp)"
-            deleted=0
-            for package_name in "${names[@]}"; do
-              encoded="$(printf '%s' "$package_name" | jq -sRr @uri)"
-              page=1
-              while [ "$page" -le 20 ]; do
-                echo "Looking for ${VERSION} in ${api_root}/packages/maven/${encoded}"
-                code="$(curl -sS -o "$body" -w '%{http_code}' \
-                  -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-                  -H "Accept: application/vnd.github+json" \
-                  -H "X-GitHub-Api-Version: 2022-11-28" \
-                  "https://api.github.com/${api_root}/packages/maven/${encoded}/versions?per_page=100&page=${page}")"
-                if [ "$code" = "404" ]; then
-                  break
-                fi
-                if [ "$code" != "200" ]; then
-                  echo "::error::Listing ${package_name} versions returned HTTP ${code}"
-                  cat "$body"
-                  rm -f "$body"
-                  return 1
-                fi
-                if [ "$(jq 'length' "$body")" = "0" ]; then
-                  break
-                fi
-                ids="$(jq -r --arg version "$VERSION" '.[] | select(.name==$version) | .id' "$body")"
-                for id in $ids; do
-                  case "$id" in
-                    ''|*[!0-9]*) continue ;;
-                  esac
-                  echo "Deleting Maven package ${package_name} version ${VERSION} (id ${id})"
-                  del="$(curl -sS -o "$body" -w '%{http_code}' -X DELETE \
-                    -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-                    -H "Accept: application/vnd.github+json" \
-                    -H "X-GitHub-Api-Version: 2022-11-28" \
-                    "https://api.github.com/${api_root}/packages/maven/${encoded}/versions/${id}")"
-                  if [ "$del" = "204" ]; then
-                    deleted=$((deleted + 1))
-                  elif [ "$del" = "400" ] && jq -e '.message | test("delete the package instead")' "$body" >/dev/null; then
-                    echo "Version ${VERSION} is the only version of ${package_name}; deleting the package"
-                    del="$(curl -sS -o "$body" -w '%{http_code}' -X DELETE \
-                      -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-                      -H "Accept: application/vnd.github+json" \
-                      -H "X-GitHub-Api-Version: 2022-11-28" \
-                      "https://api.github.com/${api_root}/packages/maven/${encoded}")"
-                    if [ "$del" != "204" ] && [ "$del" != "404" ]; then
-                      echo "::error::Deleting package ${package_name} returned HTTP ${del}"
-                      cat "$body"
-                      rm -f "$body"
-                      return 1
-                    fi
-                    deleted=$((deleted + 1))
-                    break 2
-                  elif [ "$del" != "404" ]; then
-                    echo "::error::Deleting ${package_name} version ${id} returned HTTP ${del}"
-                    cat "$body"
-                    rm -f "$body"
-                    return 1
-                  fi
-                done
-                page=$((page + 1))
-              done
-            done
-            rm -f "$body"
-            echo "Removed ${deleted} GitHub Packages version(s) named ${VERSION}"
-          }
-
-          attempt=1
-          while [ "$attempt" -le 4 ]; do
-            delete_maven_version
-            if mvn -B deploy -DskipTests -DaltDeploymentRepository="github::https://maven.pkg.github.com/${GITHUB_REPOSITORY}"; then
-              exit 0
-            fi
-            echo "Publishing ${VERSION} failed on attempt ${attempt}."
-            if [ "$attempt" -eq 4 ]; then
-              break
-            fi
-            sleep $((attempt * 20))
-            attempt=$((attempt + 1))
-          done
-          echo "::error::Could not publish ${VERSION} after deleting the existing GitHub Packages version"
-          exit 1
+        run: bash .github/scripts/publish-maven.sh
 
       - name: Publish GitHub release
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          gh release create "$VERSION" \
-            "target/spring-schema-migration-generator-${VERSION}.jar" \
-            --title "$VERSION" \
-            --target "$GITHUB_SHA" \
-            --notes "Library build ${VERSION}"
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: ${{ steps.version.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          body: Library build ${{ steps.version.outputs.version }}
+          files: target/spring-schema-migration-generator-${{ steps.version.outputs.version }}.jar
+          fail_on_unmatched_files: true
