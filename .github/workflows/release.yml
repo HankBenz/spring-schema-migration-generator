@@ -30,7 +30,7 @@ jobs:
           server-username: GITHUB_ACTOR
           server-password: GITHUB_TOKEN
 
-      - name: Version from date, time, and branch
+      - name: Version from date and branch
         id: version
         run: |
           branch="${GITHUB_REF_NAME//\//_}"
@@ -39,7 +39,7 @@ jobs:
             echo "::error::Branch name cannot be used as a version"
             exit 1
           fi
-          version="${branch}-$(date -u +%y%m%d%H%M)"
+          version="${branch}-$(date -u +%y%m%d)"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "Release version $version"
 
@@ -48,6 +48,24 @@ jobs:
 
       - name: Set release version
         run: mvn -B versions:set -DnewVersion="${{ steps.version.outputs.version }}" -DgenerateBackupPoms=false
+
+      - name: Replace the existing release
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            gh release delete "$VERSION" --yes --cleanup-tag
+          fi
+          gh api --method DELETE "/repos/${GITHUB_REPOSITORY}/git/refs/tags/${VERSION}" >/dev/null 2>&1 || true
+          if gh api "/orgs/${GITHUB_REPOSITORY_OWNER}" >/dev/null 2>&1; then
+            versions_url="/orgs/${GITHUB_REPOSITORY_OWNER}/packages/maven/no1.libs.spring-schema-migration-generator/versions"
+          else
+            versions_url="/user/packages/maven/no1.libs.spring-schema-migration-generator/versions"
+          fi
+          ids="$(gh api --paginate "$versions_url" --jq ".[] | select(.name==\"${VERSION}\") | .id" || true)"
+          for id in $ids; do
+            gh api --method DELETE "${versions_url}/${id}"
+          done
 
       - name: Publish to GitHub Packages
         run: mvn -B deploy -DskipTests -DaltDeploymentRepository="github::https://maven.pkg.github.com/${GITHUB_REPOSITORY}"
