@@ -143,6 +143,21 @@ jobs:
                     "https://api.github.com/${api_root}/packages/maven/${encoded}/versions/${id}")"
                   if [ "$del" = "204" ]; then
                     deleted=$((deleted + 1))
+                  elif [ "$del" = "400" ] && jq -e '.message | test("delete the package instead")' "$body" >/dev/null; then
+                    echo "Version ${VERSION} is the only version of ${package_name}; deleting the package"
+                    del="$(curl -sS -o "$body" -w '%{http_code}' -X DELETE \
+                      -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+                      -H "Accept: application/vnd.github+json" \
+                      -H "X-GitHub-Api-Version: 2022-11-28" \
+                      "https://api.github.com/${api_root}/packages/maven/${encoded}")"
+                    if [ "$del" != "204" ] && [ "$del" != "404" ]; then
+                      echo "::error::Deleting package ${package_name} returned HTTP ${del}"
+                      cat "$body"
+                      rm -f "$body"
+                      return 1
+                    fi
+                    deleted=$((deleted + 1))
+                    break 2
                   elif [ "$del" != "404" ]; then
                     echo "::error::Deleting ${package_name} version ${id} returned HTTP ${del}"
                     cat "$body"
