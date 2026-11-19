@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - "**"
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    env:
+      GITHUB_ACTOR: ${{ github.actor }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+          server-id: github
+          server-username: GITHUB_ACTOR
+          server-password: GITHUB_TOKEN
+
+      - name: Version from date, time, and branch
+        id: version
+        run: |
+          branch="${GITHUB_REF_NAME//\//_}"
+          branch="$(printf '%s' "$branch" | sed -E 's/[^A-Za-z0-9_-]+/_/g; s/^_+//; s/_+$//')"
+          if [ -z "$branch" ]; then
+            echo "::error::Branch name cannot be used as a version"
+            exit 1
+          fi
+          version="$(date -u +%Y%m%d.%H%M)-${branch}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Release version $version"
+
+      - name: Test
+        run: mvn -B verify
+
+      - name: Set release version
+        run: mvn -B versions:set -DnewVersion="${{ steps.version.outputs.version }}" -DgenerateBackupPoms=false
+
+      - name: Publish to GitHub Packages
+        run: mvn -B deploy -DskipTests -DaltDeploymentRepository="github::https://maven.pkg.github.com/${GITHUB_REPOSITORY}"
+
+      - name: Publish GitHub release
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "$VERSION" \
+            "target/spring-db-migration-auto-generator-${VERSION}.jar" \
+            --title "$VERSION" \
+            --target "$GITHUB_SHA" \
+            --notes "Library build ${VERSION}"
