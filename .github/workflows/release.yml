@@ -57,7 +57,7 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           gh release create "$VERSION" \
-            "target/spring-db-migration-auto-generator-${VERSION}.jar" \
+            "target/spring-schema-migration-generator-${VERSION}.jar" \
             --title "$VERSION" \
             --target "$GITHUB_SHA" \
             --notes "Library build ${VERSION}"
