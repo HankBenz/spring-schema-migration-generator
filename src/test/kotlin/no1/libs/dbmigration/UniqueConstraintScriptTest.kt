@@ -15,6 +15,7 @@ class UniqueConstraintScriptTest {
 		assertTrue(migrationStatements(required, actual).isEmpty())
 	}
 
+	// A name mismatch is a different constraint, even when the columns are the same.
 	@Test
 	fun `a unique constraint whose name is not declared on the entity is replaced`() {
 		val column = ColumnModel("global_id", "uuid", nullable = false)
@@ -46,6 +47,7 @@ class UniqueConstraintScriptTest {
 		)
 	}
 
+	// Objects present in the database and absent from the entity model are dropped, in dependency order.
 	@Test
 	fun `an unmapped table column sequence and schema are dropped`() {
 		val required = SchemaModel(schemas = setOf("public"), sequences = setOf(SequenceName("public", "id")), tables = emptyList())

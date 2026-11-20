@@ -29,6 +29,7 @@ class EnumColumnScriptTest {
 		)
 	}
 
+	// bigserial and bigint nextval('...') are the same column after type canonicalization.
 	@Test
 	fun `a postgres serial id is already the entity bigint`() {
 		val id = ColumnModel("id", "bigint", nullable = false, defaultSql = "nextval('id')")
@@ -38,6 +39,7 @@ class EnumColumnScriptTest {
 		assertTrue(migrationStatements(required, actual).isEmpty())
 	}
 
+	// Postgres stores the entity `in (...)` check as `= ANY (ARRAY[...])`.
 	@Test
 	fun `a postgres rewritten enum check is the entity check`() {
 		val rewritten = CheckModel(

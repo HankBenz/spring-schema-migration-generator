@@ -53,6 +53,7 @@ data class IndexModel(
 	val expression: Boolean = false,
 )
 
+// Drops run before creates. Tables are created in foreign-key order so a referenced table exists first.
 fun migrationStatements(required: SchemaModel, actual: SchemaModel, rules: SqlRules = SqlRules()): List<String> {
 	val statements = mutableListOf<String>()
 	val requiredTables = required.tables.associateBy { it.schema to it.name }
@@ -256,12 +257,14 @@ private fun sameForeignKey(required: ForeignKeyModel, actual: ForeignKeyModel): 
 		required.referencedTable == actual.referencedTable &&
 		required.referencedColumns == actual.referencedColumns
 
+// Expression indexes have no column list to compare, so they are never treated as the same index.
 private fun sameIndex(required: IndexModel, actual: IndexModel): Boolean =
 	!actual.expression &&
 		required.name == actual.name &&
 		required.unique == actual.unique &&
 		required.columns == actual.columns
 
+// Postgres rewrites `in (...)` as `= ANY (ARRAY[...])`. Quoted literals decide equality when both sides have them.
 private fun sameCheck(required: CheckModel, actual: CheckModel): Boolean {
 	if (required.name != null && required.name != actual.name) return false
 	if (required.columns.isNotEmpty() && actual.columns.isNotEmpty() && required.columns != actual.columns) return false
@@ -274,6 +277,7 @@ private fun sameCheck(required: CheckModel, actual: CheckModel): Boolean {
 private fun literals(expression: String): List<String> =
 	Regex("'([^']*)'").findAll(expression).map { it.groupValues[1] }.sorted().toList()
 
+// Fold vendor type names so an unchanged column is not emitted as an alter.
 fun canonicalType(sqlType: String): String {
 	var type = sqlType.lowercase().trim()
 	type = type.replace("character varying", "varchar")
@@ -325,6 +329,7 @@ private fun parenBalanced(text: String): Boolean {
 	return depth == 0
 }
 
+// Catalog schemas are never dropped, even when the entity model does not mention them.
 internal fun systemSchema(name: String): Boolean {
 	val schema = name.lowercase()
 	return schema == "information_schema" ||
@@ -336,6 +341,7 @@ internal fun systemSchema(name: String): Boolean {
 		schema.startsWith("pg_")
 }
 
+// Identifiers are quoted only after a name check, so a value cannot be interpolated as SQL.
 internal fun quoteIdentifier(identifier: String, rules: SqlRules): String {
 	require(identifier.matches(Regex("[A-Za-z_][A-Za-z0-9_]*"))) { "Refusing to emit an identifier: $identifier" }
 	val quote = rules.identifierQuote

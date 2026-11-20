@@ -75,6 +75,7 @@ class SchemaMigrationCheck(
 	private val implicitNaming: ImplicitNamingStrategy,
 	private val columnOrdering: ColumnOrderingStrategy,
 ) : SmartInitializingSingleton {
+	// A non-empty diff is written as the next Flyway script, then startup fails so the script is reviewed before it runs.
 	override fun afterSingletonsInstantiated() {
 		if (suppressed()) return
 		openConnection().use { connection ->
@@ -110,6 +111,7 @@ class SchemaMigrationCheck(
 		}
 	}
 
+	// Both Hibernate schema-generation actions set to none means this check stays quiet.
 	private fun suppressed(): Boolean {
 		val database = environment.getProperty(DATABASE_ACTION)
 		val scripts = environment.getProperty(SCRIPTS_ACTION)

@@ -79,6 +79,7 @@ private fun sequenceReference(defaultSql: String?, tableSchema: String): Sequenc
 	return SequenceName(match.groupValues[1].ifEmpty { tableSchema }, match.groupValues[2])
 }
 
+// Hibernate treats Kotlin properties as nullable. The Kotlin declaration is the one that is stored.
 private fun applyKotlinNullability(metadata: Metadata) {
 	for (binding in metadata.entityBindings) {
 		val entity = binding.mappedClass ?: continue
@@ -110,6 +111,7 @@ fun databaseNullable(entity: Class<*>, propertyName: String): Boolean {
 }
 
 class EntityFieldColumnOrderingStrategy : ColumnOrderingStrategy {
+	// Column order follows the entity's primary-constructor parameters.
 	override fun orderTableColumns(table: Table, metadata: Metadata): List<Column>? {
 		val binding = metadata.entityBindings.firstOrNull { it.table.exportIdentifier == table.exportIdentifier }
 			?: return null
@@ -150,6 +152,7 @@ class EntityFieldColumnOrderingStrategy : ColumnOrderingStrategy {
 		else binding.properties.find { it.name == name }
 }
 
+// The name is derived from the table and columns so a regenerated key matches the one already in the database.
 class ReadableForeignKeyNamingStrategy : ImplicitNamingStrategyJpaCompliantImpl() {
 	override fun determineForeignKeyName(source: ImplicitForeignKeyNameSource): Identifier {
 		source.userProvidedIdentifier?.let { return it }
@@ -176,6 +179,7 @@ class ReadableForeignKeyNamingStrategy : ImplicitNamingStrategyJpaCompliantImpl(
 	}
 }
 
+// `FooEntity` maps to `foo`. The `_entity` suffix is not part of the table name.
 class EntitySuffixPhysicalNamingStrategy : PhysicalNamingStrategySnakeCaseImpl() {
 	override fun toPhysicalTableName(logicalName: Identifier, jdbcEnvironment: JdbcEnvironment): Identifier {
 		val snake = super.toPhysicalTableName(logicalName, jdbcEnvironment)

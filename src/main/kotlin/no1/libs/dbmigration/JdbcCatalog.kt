@@ -17,6 +17,7 @@ internal fun readCatalog(connection: Connection, historyTable: String, defaultSc
 		meta.getTables(scope.catalog, scope.schema, "%", arrayOf("TABLE")).use { rows ->
 			while (rows.next()) {
 				val table = rows.getString("TABLE_NAME")?.lowercase() ?: continue
+				// Flyway's history table is not part of the entity model.
 				if (table == historyTable.lowercase()) continue
 				tables += readTable(meta, scope, table, checks, uniques)
 			}
@@ -31,6 +32,7 @@ internal fun sqlRules(connection: Connection, sequenceStarts: Map<String, Long>)
 	val quote = meta.identifierQuoteString?.trim().orEmpty().ifBlank { "\"" }
 	return SqlRules(
 		identifierQuote = quote,
+		// Only these products accept CASCADE on drop table, drop sequence, and drop schema.
 		cascade = product.contains("postgres") || product.contains("h2"),
 		defaultSchema = currentNamespace(connection, meta),
 		sequenceStarts = sequenceStarts,
@@ -150,6 +152,7 @@ private fun readUniqueConstraints(connection: Connection): Map<Pair<String, Stri
 	}
 }
 
+// information_schema stores Postgres's rewritten check text. pg_catalog keeps the original expression.
 private fun readChecks(connection: Connection): Map<Triple<String, String, String>, CheckModel> {
 	val product = connection.metaData.databaseProductName.lowercase()
 	if (product.contains("postgres")) {
@@ -284,6 +287,7 @@ private fun readTable(
 	val foreignKeys = readForeignKeys(meta, scope, table)
 	val uniqueKeys = (uniques?.get(schema to table) ?: emptyList()).toMutableList()
 	val indexes = mutableListOf<IndexModel>()
+	// When information_schema unique constraints are unavailable, unique indexes stand in for them.
 	readIndexes(meta, scope, table, primaryKeyName, uniqueKeys, indexes, classifyUniqueIndexes = uniques == null)
 	return TableModel(
 		schema = schema,
