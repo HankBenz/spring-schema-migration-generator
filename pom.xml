@@ -15,6 +15,7 @@
 		<spring-boot.version>4.1.2</spring-boot.version>
 		<hibernate.version>7.4.13.Final</hibernate.version>
 		<maven.compiler.release>25</maven.compiler.release>
+		<m2.dev.libs>${user.home}/.m2x/repository</m2.dev.libs>
 	</properties>
 
 	<dependencies>
@@ -92,6 +93,25 @@
 			<plugin>
 				<artifactId>maven-surefire-plugin</artifactId>
 				<version>3.5.3</version>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-install-plugin</artifactId>
+				<version>3.1.4</version>
+				<executions>
+					<execution>
+						<id>install-m2x</id>
+						<phase>install</phase>
+						<goals>
+							<goal>install-file</goal>
+						</goals>
+						<configuration>
+							<file>${project.build.directory}/${project.build.finalName}.jar</file>
+							<pomFile>${project.basedir}/pom.xml</pomFile>
+							<localRepositoryPath>${m2.dev.libs}</localRepositoryPath>
+						</configuration>
+					</execution>
+				</executions>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>

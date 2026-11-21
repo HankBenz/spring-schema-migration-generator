@@ -24,6 +24,8 @@ hankbenz:spring-schema-migration-generator:init-261119
 
 The version on GitHub is `<branch>-<yyMMdd>`, for example `init-261119`. Use the newest release from [Releases](https://github.com/HankBenz/spring-schema-migration-generator/releases). A local `mvn install` publishes the version `local` from this repository's POM. The release workflow replaces that with the branch-and-date version before it publishes.
 
+`mvn install` also writes the same jar to `~/.m2x/repository` (override with `M2_DEV_LIBS`). Default `~/.m2` is unchanged. Docker Compose in consuming apps can bind `~/.m2x` as the slim Maven context.
+
 Gradle:
 
 ```kotlin
@@ -113,5 +115,11 @@ Java 25 and Maven:
 ```bash
 mvn verify
 ```
+
+```bash
+mvn install
+```
+
+That installs `hankbenz:spring-schema-migration-generator:local` into both `~/.m2/repository` and `~/.m2x/repository`.
 
 A push to any branch runs the tests and publishes `hankbenz:spring-schema-migration-generator:<branch>-<yyMMdd>`. A second push of the same branch on the same UTC day replaces that release.
