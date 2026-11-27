@@ -10,38 +10,55 @@ class EnumColumnScriptTest {
 
 	@Test
 	fun `a new table creates an enum column with its allowed values`() {
+		// Arrange
 		val required = schema(table(listOf(state), listOf(stateValues)))
+		val actual = schema()
 
+		// Act
+		val statements = migrationStatements(required, actual)
+
+		// Assert
 		assertEquals(
 			listOf("create table \"public\".\"payamak_report\" (\n\t\"state\" varchar(255) not null check (state in ('PENDING', 'REVIEWED', 'POSTPONED'))\n);"),
-			migrationStatements(required, schema()),
+			statements,
 		)
 	}
 
 	@Test
 	fun `a new enum column is created with its allowed values`() {
+		// Arrange
 		val required = schema(table(listOf(ColumnModel("id", "bigint", nullable = false), state), listOf(stateValues)))
 		val actual = schema(table(listOf(ColumnModel("id", "bigint", nullable = false))))
 
+		// Act
+		val statements = migrationStatements(required, actual)
+
+		// Assert
 		assertEquals(
 			listOf("""alter table "public"."payamak_report" add column "state" varchar(255) not null check (state in ('PENDING', 'REVIEWED', 'POSTPONED'));"""),
-			migrationStatements(required, actual),
+			statements,
 		)
 	}
 
 	// bigserial and bigint nextval('...') are the same column after type canonicalization.
 	@Test
 	fun `a postgres serial id is already the entity bigint`() {
+		// Arrange
 		val id = ColumnModel("id", "bigint", nullable = false, defaultSql = "nextval('id')")
 		val required = schema(table(listOf(id)))
 		val actual = schema(table(listOf(id.copy(sqlType = "bigserial"))))
 
-		assertTrue(migrationStatements(required, actual).isEmpty())
+		// Act
+		val statements = migrationStatements(required, actual)
+
+		// Assert
+		assertTrue(statements.isEmpty())
 	}
 
 	// Postgres stores the entity `in (...)` check as `= ANY (ARRAY[...])`.
 	@Test
 	fun `a postgres rewritten enum check is the entity check`() {
+		// Arrange
 		val rewritten = CheckModel(
 			"payamak_report_state_check",
 			listOf("state"),
@@ -50,17 +67,26 @@ class EnumColumnScriptTest {
 		val required = schema(table(listOf(state), listOf(stateValues)))
 		val actual = schema(table(listOf(state), listOf(rewritten)))
 
-		assertTrue(migrationStatements(required, actual).isEmpty())
+		// Act
+		val statements = migrationStatements(required, actual)
+
+		// Assert
+		assertTrue(statements.isEmpty())
 	}
 
 	@Test
 	fun `an existing enum column gains its value check`() {
+		// Arrange
 		val required = schema(table(listOf(state), listOf(stateValues)))
 		val actual = schema(table(listOf(state)))
 
+		// Act
+		val statements = migrationStatements(required, actual)
+
+		// Assert
 		assertEquals(
 			listOf("""alter table "public"."payamak_report" add check (state in ('PENDING', 'REVIEWED', 'POSTPONED'));"""),
-			migrationStatements(required, actual),
+			statements,
 		)
 	}
 

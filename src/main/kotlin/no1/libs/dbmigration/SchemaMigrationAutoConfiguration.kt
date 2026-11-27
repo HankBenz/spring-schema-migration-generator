@@ -8,8 +8,6 @@ import org.hibernate.boot.model.relational.ColumnOrderingStrategy
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder
 import org.hibernate.cfg.JdbcSettings
 import org.hibernate.cfg.MappingSettings
-import org.hibernate.engine.jdbc.dialect.internal.StandardDialectResolver
-import org.hibernate.engine.jdbc.dialect.spi.DatabaseMetaDataDialectResolutionInfoAdapter
 import org.hibernate.tool.schema.spi.SchemaManagementException
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.ObjectProvider
@@ -80,11 +78,12 @@ class SchemaMigrationCheck(
 		if (suppressed()) return
 		openConnection().use { connection ->
 			val meta = connection.metaData
-			val dialect = StandardDialectResolver().resolveDialect(DatabaseMetaDataDialectResolutionInfoAdapter(meta))
-				?: error("Schema migration found no Hibernate dialect for ${meta.databaseProductName} ${meta.databaseProductVersion}")
 			val rules = sqlRules(connection, properties.sequenceStarts)
+			// Product name and version already came from this connection. Leave JDBC metadata
+			// access off: this registry has no ConnectionProvider, and an explicit dialect
+			// makes Hibernate 7 warn that the dialect should be selected automatically.
 			val registry = StandardServiceRegistryBuilder()
-				.applySetting(JdbcSettings.DIALECT, dialect)
+				.applySetting(JdbcSettings.ALLOW_METADATA_ON_BOOT, false)
 				.applySetting(JdbcSettings.JAKARTA_HBM2DDL_DB_NAME, meta.databaseProductName)
 				.applySetting(JdbcSettings.JAKARTA_HBM2DDL_DB_MAJOR_VERSION, meta.databaseMajorVersion)
 				.applySetting(JdbcSettings.JAKARTA_HBM2DDL_DB_MINOR_VERSION, meta.databaseMinorVersion)

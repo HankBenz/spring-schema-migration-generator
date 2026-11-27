@@ -14,6 +14,13 @@
 		<kotlin.version>2.3.21</kotlin.version>
 		<spring-boot.version>4.1.2</spring-boot.version>
 		<hibernate.version>7.4.13.Final</hibernate.version>
+		<jakarta-persistence.version>3.2.0</jakarta-persistence.version>
+		<spring.version>7.0.2</spring.version>
+		<slf4j.version>2.0.17</slf4j.version>
+		<junit-jupiter.version>5.12.2</junit-jupiter.version>
+		<maven-surefire.version>3.5.3</maven-surefire.version>
+		<maven-install.version>3.1.4</maven-install.version>
+		<maven-enforcer.version>3.5.0</maven-enforcer.version>
 		<maven.compiler.release>25</maven.compiler.release>
 		<m2.dev.libs>${user.home}/.m2x/repository</m2.dev.libs>
 	</properties>
@@ -37,7 +44,7 @@
 		<dependency>
 			<groupId>jakarta.persistence</groupId>
 			<artifactId>jakarta.persistence-api</artifactId>
-			<version>3.2.0</version>
+			<version>${jakarta-persistence.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -47,17 +54,17 @@
 		<dependency>
 			<groupId>org.springframework</groupId>
 			<artifactId>spring-jdbc</artifactId>
-			<version>7.0.2</version>
+			<version>${spring.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>
-			<version>2.0.17</version>
+			<version>${slf4j.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.junit.jupiter</groupId>
 			<artifactId>junit-jupiter</artifactId>
-			<version>5.12.2</version>
+			<version>${junit-jupiter.version}</version>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
@@ -92,12 +99,12 @@
 			</plugin>
 			<plugin>
 				<artifactId>maven-surefire-plugin</artifactId>
-				<version>3.5.3</version>
+				<version>${maven-surefire.version}</version>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-install-plugin</artifactId>
-				<version>3.1.4</version>
+				<version>${maven-install.version}</version>
 				<executions>
 					<execution>
 						<id>install-m2x</id>
@@ -116,7 +123,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-enforcer-plugin</artifactId>
-				<version>3.5.0</version>
+				<version>${maven-enforcer.version}</version>
 				<executions>
 					<execution>
 						<id>require-java-25</id>
